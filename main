@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chores Manager</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .hidden { display: none; }
+    .chore { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 5px; }
+    button { margin: 5px; }
+    #loginContainer { text-align: center; margin-top: 50px; }
+    #choresContainer { margin-top: 20px; }
+    #roleLabel { font-weight: bold; }
+    .timestamp { display: block; font-size: 0.8em; color: #555; margin-top: 5px; }
+    .filter-bar { margin: 15px 0; }
+    .filter-tab {
+      padding: 8px 18px;
+      border: none;
+      border-radius: 4px 4px 0 0;
+      background: #eee;
+      cursor: pointer;
+      margin-right: 5px;
+      transition: background 0.2s;
+    }
+    .filter-tab.selected {
+      background: #ccc;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="loginContainer">
+    <h2>Login</h2>
+    <input type="password" id="accessCode" placeholder="Enter Parent or Child Code">
+    <button onclick="login()">Login</button>
+  </div>
+
+  <div id="app" class="hidden">
+    <h2>Chores Manager (<span id="roleLabel"></span>)</h2>
+
+    <div class="filter-bar">
+      <button class="filter-tab selected" id="filterAll" onclick="setFilter('all')">All Chores</button>
+      <button class="filter-tab" id="filterPending" onclick="setFilter('pending')">Pending</button>
+      <button class="filter-tab" id="filterCompleted" onclick="setFilter('completed')">Completed</button>
+    </div>
+
+    <input type="text" id="newChore" placeholder="Enter a new chore">
+    <button onclick="addChore()">Add Chore</button>
+    <div id="choresContainer"></div>
+  </div>
+
+  <script>
+    const parentCode = "parent123";
+    const childCode = "child123";
+    let role = "";
+    let chores = [];
+    let filter = "all"; // can be all, pending, or completed
+
+    window.onload = () => {
+      loadChores();
+    };
+
+    function login() {
+      const code = document.getElementById("accessCode").value;
+      if (code === parentCode) {
+        role = "parent";
+      } else if (code === childCode) {
+        role = "child";
+      } else {
+        alert("Invalid code!");
+        return;
+      }
+      document.getElementById("loginContainer").classList.add("hidden");
+      document.getElementById("app").classList.remove("hidden");
+      document.getElementById("roleLabel").innerText = role;
+      renderChores();
+    }
+
+    function addChore() {
+      const choreText = document.getElementById("newChore").value.trim();
+      if (choreText) {
+        chores.push({ text: choreText, status: "pending", createdAt: Date.now() });
+        document.getElementById("newChore").value = "";
+        saveChores();
+        renderChores();
+      }
+    }
+
+    function saveChores() {
+      localStorage.setItem("chores", JSON.stringify(chores));
+    }
+
+    function loadChores() {
+      const saved = localStorage.getItem("chores");
+      if (saved) {
+        chores = JSON.parse(saved);
+        const threeDays = 3 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        chores = chores.filter(chore => now - chore.createdAt <= threeDays);
+        saveChores();
+      }
+    }
+
+    function setFilter(newFilter) {
+      filter = newFilter;
+      document.getElementById("filterAll").classList.remove("selected");
+      document.getElementById("filterPending").classList.remove("selected");
+      document.getElementById("filterCompleted").classList.remove("selected");
+      document.getElementById("filter" + capitalizeFirst(newFilter)).classList.add("selected");
+      renderChores();
+    }
+
+    function capitalizeFirst(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    function formatDate(timestamp) {
+      const date = new Date(timestamp);
+      return date.toLocaleString(); // e.g. Sep 22, 2025, 2:15 PM
+    }
+
+    function renderChores() {
+      const container = document.getElementById("choresContainer");
+      container.innerHTML = "";
+
+      let filteredChores = chores;
+      if (filter === "pending") {
+        filteredChores = chores.filter(chore => chore.status === "pending");
+      } else if (filter === "completed") {
+        filteredChores = chores.filter(chore => chore.status === "completed");
+      }
+
+      filteredChores.forEach((chore, index) => {
+        // Find the real index in the chores array in case of filtering
+        const realIndex = chores.indexOf(chore);
+
+        const choreDiv = document.createElement("div");
+        choreDiv.className = "chore";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = chore.text;
+        input.onchange = (e) => {
+          chores[realIndex].text = e.target.value;
+          saveChores();
+        };
+        choreDiv.appendChild(input);
+
+        const completeBtn = document.createElement("button");
+        completeBtn.innerText = "Completed";
+        completeBtn.onclick = () => {
+          chores[realIndex].status = "completed";
+          saveChores();
+          renderChores();
+        };
+        choreDiv.appendChild(completeBtn);
+
+        const remindBtn = document.createElement("button");
+        remindBtn.innerText = "Remind Me in 30 mins";
+        remindBtn.onclick = () => {
+          setTimeout(() => alert(`Reminder: ${chore.text}`), 1800000);
+        };
+        choreDiv.appendChild(remindBtn);
+
+        if (role === "parent") {
+          const deleteBtn = document.createElement("button");
+          deleteBtn.innerText = "Delete";
+          deleteBtn.onclick = () => {
+            chores.splice(realIndex, 1);
+            saveChores();
+            renderChores();
+          };
+          choreDiv.appendChild(deleteBtn);
+        }
+
+        const timestamp = document.createElement("span");
+        timestamp.className = "timestamp";
+        timestamp.innerText = "Added on: " + formatDate(chore.createdAt);
+        choreDiv.appendChild(timestamp);
+
+        container.appendChild(choreDiv);
+      });
+
+      if (filteredChores.length === 0) {
+        container.innerHTML = "<div>No chores to display.</div>";
+      }
+    }
+  </script>
+</body>
+</html>
